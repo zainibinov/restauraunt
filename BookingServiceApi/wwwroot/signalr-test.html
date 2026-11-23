@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Проверка SignalR</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 820px; margin: 24px auto; padding: 0 16px; }
+    label { display: block; margin-top: 12px; font-weight: 600; }
+    input { width: 100%; padding: 8px; box-sizing: border-box; font-family: monospace; }
+    button { margin: 8px 8px 0 0; padding: 8px 14px; }
+    #status { margin-top: 12px; font-weight: 600; }
+    #log { margin-top: 12px; padding: 10px; background: #f3f3f3; border-radius: 6px; min-height: 160px;
+           font-family: monospace; font-size: 13px; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h2>Проверка SignalR (BookingService)</h2>
+
+  <label for="token">accessToken</label>
+  <input id="token" placeholder="eyJhbGciOi...">
+  <button id="connect">Подключиться</button>
+  <button id="disconnect" disabled>Отключиться</button>
+  <div id="status">Не подключено</div>
+
+  <label for="bookingId">ID брони (чтобы получать смену её статуса)</label>
+  <input id="bookingId" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
+  <button id="subscribe" disabled>Подписаться на бронь</button>
+
+  <div id="log"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@microsoft/signalr@8.0.0/dist/browser/signalr.min.js"></script>
+  <script>
+    const $ = id => document.getElementById(id);
+    let connection = null;
+
+    function log(text) {
+      $('log').textContent = new Date().toLocaleTimeString() + '  ' + text + '\n' + $('log').textContent;
+    }
+    function setState(connected) {
+      $('status').textContent = connected ? 'Подключено' : 'Не подключено';
+      $('connect').disabled = connected;
+      $('disconnect').disabled = !connected;
+      $('subscribe').disabled = !connected;
+    }
+
+    $('connect').onclick = async () => {
+      const token = $('token').value.trim();
+      if (!token) { log('Вставьте accessToken'); return; }
+
+      connection = new signalR.HubConnectionBuilder()
+        .withUrl('/hubs/bookings', { accessTokenFactory: () => token })
+        .withAutomaticReconnect()
+        .build();
+
+      connection.on('TableLocked', e => log('TableLocked: стол ' + e.tableId + ' занят в ' + e.slotTime));
+      connection.on('TableReleased', e => log('TableReleased: стол ' + e.tableId + ' свободен в ' + e.slotTime));
+      connection.on('BookingStatusChanged', e => log('BookingStatusChanged: бронь ' + e.bookingId + ' -> ' + e.status));
+      connection.onclose(() => { setState(false); log('Соединение закрыто'); });
+
+      try {
+        await connection.start();
+        setState(true);
+        log('Подключились');
+      } catch (err) {
+        log('Ошибка подключения: ' + err);
+      }
+    };
+
+    $('disconnect').onclick = async () => { if (connection) await connection.stop(); };
+
+    $('subscribe').onclick = async () => {
+      const id = $('bookingId').value.trim();
+      if (!id) { log('Вставьте ID брони'); return; }
+      try {
+        await connection.invoke('SubscribeBooking', id);
+        log('Подписались на бронь ' + id);
+      } catch (err) {
+        log('Не удалось подписаться: ' + err);
+      }
+    };
+  </script>
+</body>
+</html>

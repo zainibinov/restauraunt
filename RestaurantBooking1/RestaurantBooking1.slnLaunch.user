@@ -1,0 +1,23 @@
+[
+  {
+    "Name": "Новый профиль",
+    "Projects": [
+      {
+        "Path": "..\\AuthServiceApi\\AuthServiceApi.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "..\\AvailabilityServiceApi\\AvailabilityServiceApi.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "..\\BookingServiceApi\\BookingServiceApi.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "..\\NotificationServiceApi\\NotificationServiceApi.csproj",
+        "Action": "Start"
+      }
+    ]
+  }
+]

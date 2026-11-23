@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!-- lets the app run on a newer installed .NET runtime (9, 10) if 8 is not installed -->
+    <RollForward>Major</RollForward>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Pomelo.EntityFrameworkCore.MySql" Version="8.0.*" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.*" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.9.0" />
+    <PackageReference Include="Grpc.AspNetCore" Version="2.*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Protobuf Include="Protos\availability.proto" GrpcServices="Server" />
+    <Protobuf Include="Protos\booking_occupancy.proto" GrpcServices="Client" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,563 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Бронирование столиков</title>
+<style>
+  :root {
+    --bg: #f6f2ec; --surface: #fffdf9; --ink: #2b2622; --muted: #7a6f66; --line: #e4dccf;
+    --accent: #b5502f; --accent-ink: #ffffff;
+    --free: #2f8f5b; --busy: #c2412d; --small: #a39a90; --select: #2a62c9;
+    --table-fill: #fbf6ee; --floor: #efe8dc;
+    --shadow: 0 1px 2px rgba(43,38,34,.06), 0 4px 14px rgba(43,38,34,.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #171412; --surface: #221e1b; --ink: #f1ebe3; --muted: #a89d92; --line: #3a332d;
+      --accent: #d9714f; --accent-ink: #1a1512;
+      --free: #4fbf86; --busy: #ef7561; --small: #7d746b; --select: #6b9cf5;
+      --table-fill: #2c2723; --floor: #1d1a17;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 4px 14px rgba(0,0,0,.25);
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  button, input, select { font: inherit; color: inherit; }
+  .topbar { display: flex; align-items: center; gap: 16px; padding: 14px 24px; background: var(--surface);
+         border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  .brand { font-size: 18px; font-weight: 700; letter-spacing: .2px; }
+  .brand small { display: block; font-weight: 400; font-size: 12px; color: var(--muted); }
+  .spacer { flex: 1; }
+  .pill { display: inline-flex; align-items: center; gap: 8px; padding: 5px 12px; border-radius: 999px;
+          border: 1px solid var(--line); font-size: 13px; color: var(--muted); }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--small); }
+  .pill.on .dot { background: var(--free); box-shadow: 0 0 0 3px color-mix(in srgb, var(--free) 25%, transparent); }
+  .pill.wait .dot { background: #d4a017; }
+  .pill.off .dot { background: var(--busy); }
+  .btn { border: 1px solid var(--line); background: var(--surface); padding: 7px 14px; border-radius: 8px; cursor: pointer; }
+  .btn:hover { border-color: var(--muted); }
+  .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+  .btn.primary:hover { filter: brightness(1.06); }
+  .btn.small { padding: 4px 10px; font-size: 13px; }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+  .layout { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 20px; padding: 20px 24px; max-width: 1280px; margin: 0 auto; }
+  @media (max-width: 960px) { .layout { grid-template-columns: 1fr; padding: 16px; } .topbar { padding: 12px 16px; } }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; box-shadow: var(--shadow); }
+  .card + .card { margin-top: 16px; }
+  .card h2 { margin: 0 0 12px; font-size: 15px; font-weight: 700; }
+  .controls { display: flex; gap: 16px; flex-wrap: wrap; align-items: end; }
+  .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  .field input, .field select { padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); min-width: 130px; }
+  .field input[type=number] { min-width: 80px; width: 90px; }
+  .hall { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; padding: 12px;
+          border-radius: 10px; background-color: var(--floor);
+          background-image: radial-gradient(color-mix(in srgb, var(--ink) 9%, transparent) 1px, transparent 1px);
+          background-size: 18px 18px; min-height: 180px; }
+  .table { appearance: none; background: transparent; border: 2px solid transparent; border-radius: 12px; padding: 6px 6px 10px;
+           text-align: center; cursor: pointer; }
+  .table svg { width: 100%; max-width: 128px; height: auto; display: block; margin: 0 auto; }
+  .table .tabletop { fill: var(--table-fill); stroke-width: 2.5; }
+  .table .chair { stroke: none; }
+  .table .num { font-size: 26px; font-weight: 700; fill: var(--ink); }
+  .table.free .tabletop { stroke: var(--free); } .table.free .chair { fill: color-mix(in srgb, var(--free) 55%, transparent); }
+  .table.busy .tabletop { stroke: var(--busy); } .table.busy .chair { fill: color-mix(in srgb, var(--busy) 55%, transparent); }
+  .table.small .tabletop, .table.closed .tabletop { stroke: var(--small); stroke-dasharray: 5 4; }
+  .table.small .chair, .table.closed .chair { fill: color-mix(in srgb, var(--small) 40%, transparent); }
+  .table.busy, .table.small, .table.closed { cursor: not-allowed; }
+  .table.selected { border-color: var(--select); background: color-mix(in srgb, var(--select) 10%, transparent); }
+  .table.free:hover { background: color-mix(in srgb, var(--free) 10%, transparent); }
+  .table .label { font-size: 13px; font-weight: 600; margin-top: 2px; }
+  .table .sub { font-size: 12px; color: var(--muted); }
+  .table .state { font-size: 12px; font-weight: 600; }
+  .table.free .state { color: var(--free); } .table.busy .state { color: var(--busy); }
+  .table.small .state, .table.closed .state { color: var(--small); }
+  .badge { display: inline-block; padding: 0 6px; border-radius: 6px; font-size: 11px; font-weight: 700; margin-left: 4px;
+           background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
+  @keyframes flash { 0% { background: color-mix(in srgb, var(--accent) 35%, transparent); } 100% { background: transparent; } }
+  .table.flash { animation: flash 1.4s ease-out; }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 12px; font-size: 13px; color: var(--muted); }
+  .legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; background: var(--c); }
+  .bookpanel { display: flex; gap: 16px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+  .bookpanel .hint { color: var(--muted); }
+  ul.list { list-style: none; margin: 0; padding: 0; }
+  ul.list li { padding: 10px 0; border-top: 1px solid var(--line); }
+  ul.list li:first-child { border-top: 0; padding-top: 0; }
+  .bk-main { font-weight: 600; }
+  .bk-meta { display: flex; gap: 8px; align-items: center; margin-top: 4px; flex-wrap: wrap; color: var(--muted); font-size: 13px; }
+  .chip { padding: 1px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; background: var(--line); color: var(--ink); }
+  .chip.Pending { background: #f5e6b8; color: #6b5200; } .chip.Confirmed { background: #cfeedd; color: #135a34; }
+  .chip.Cancelled, .chip.NoShow { background: #ecdcd8; color: #7a2b1e; } .chip.Completed { background: #dbe6f7; color: #1d3f78; }
+  @media (prefers-color-scheme: dark) {
+    .chip.Pending { background: #5a4a14; color: #f5e6b8; } .chip.Confirmed { background: #1c4a31; color: #cfeedd; }
+    .chip.Cancelled, .chip.NoShow { background: #5a2a22; color: #f3d6d0; } .chip.Completed { background: #223a63; color: #dbe6f7; }
+  }
+  .empty { color: var(--muted); font-size: 14px; }
+  #events ul.list li { font-size: 13px; padding: 6px 0; display: flex; gap: 8px; }
+  #events .t { color: var(--muted); font-variant-numeric: tabular-nums; flex: none; }
+  #events .k { flex: none; font-weight: 700; }
+  #events .k.locked { color: var(--busy); } #events .k.released { color: var(--free); } #events .k.status { color: var(--select); }
+  .banner { background: color-mix(in srgb, var(--busy) 14%, var(--surface)); border: 1px solid var(--busy); border-radius: 10px;
+            padding: 10px 14px; margin: 16px 24px 0; font-size: 14px; }
+  dialog { border: 1px solid var(--line); border-radius: 14px; background: var(--surface); color: var(--ink); padding: 22px; width: min(420px, 92vw); }
+  dialog::backdrop { background: rgba(0,0,0,.4); }
+  dialog h2 { margin: 0 0 14px; }
+  dialog form { display: grid; gap: 10px; }
+  dialog input { width: 100%; padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
+  dialog .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  dialog .actions { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; }
+  dialog .err { color: var(--busy); font-size: 13px; min-height: 18px; }
+  .link { background: none; border: 0; color: var(--accent); cursor: pointer; padding: 0; text-decoration: underline; }
+  #toasts { position: fixed; right: 16px; bottom: 16px; display: grid; gap: 8px; z-index: 50; }
+  .toast { background: var(--ink); color: var(--bg); padding: 10px 14px; border-radius: 10px; max-width: 340px; box-shadow: var(--shadow); font-size: 14px; }
+  .toast.err { background: var(--busy); color: #fff; }
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">Бронирование столиков<small id="hallName">загрузка зала...</small></div>
+  <div class="spacer"></div>
+  <div id="conn" class="pill off"><span class="dot"></span><span id="connText">Live: нужен вход</span></div>
+  <div id="userbox"></div>
+</header>
+<div id="banner" class="banner" hidden></div>
+
+<main class="layout">
+  <section>
+    <div class="card">
+      <div class="controls">
+        <div class="field"><label for="date">Дата</label><input type="date" id="date"></div>
+        <div class="field"><label for="time">Время</label><select id="time"></select></div>
+        <div class="field"><label for="guests">Гостей</label><input type="number" id="guests" min="1" max="30" value="2"></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Схема зала</h2>
+      <div id="hall" class="hall" aria-live="polite"></div>
+      <div class="legend">
+        <span style="--c: var(--free)">свободен</span>
+        <span style="--c: var(--busy)">занят</span>
+        <span style="--c: var(--small)">мало мест / не работает</span>
+        <span style="--c: var(--select)">выбран</span>
+      </div>
+    </div>
+    <div class="card"><div id="bookPanel" class="bookpanel"></div></div>
+  </section>
+
+  <aside>
+    <div class="card"><h2>Мои брони</h2><div id="myBookings"></div></div>
+    <div class="card" id="events"><h2>События в реальном времени</h2><div id="eventsBody"></div></div>
+  </aside>
+</main>
+
+<dialog id="authDialog">
+  <h2 id="authTitle">Вход</h2>
+  <form id="authForm">
+    <div id="regFields" hidden>
+      <div class="row">
+        <input id="firstName" placeholder="Имя" autocomplete="given-name">
+        <input id="lastName" placeholder="Фамилия" autocomplete="family-name">
+      </div>
+      <input id="phone" placeholder="Телефон, например +79990000000" autocomplete="tel" style="margin-top:10px">
+    </div>
+    <input id="email" type="email" placeholder="Email" autocomplete="email" required>
+    <input id="password" type="password" placeholder="Пароль (от 8 символов)" autocomplete="current-password" required>
+    <div class="err" id="authErr"></div>
+    <div class="actions">
+      <button type="button" class="link" id="authSwitch">Нет аккаунта? Регистрация</button>
+      <span><button type="button" class="btn" id="authCancel">Отмена</button> <button class="btn primary" id="authSubmit">Войти</button></span>
+    </div>
+  </form>
+</dialog>
+<div id="toasts"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@microsoft/signalr@8.0.0/dist/browser/signalr.min.js"></script>
+<script>
+'use strict';
+// ---- addresses: the page is served by BookingService, so it talks to it on the same origin ----
+const AUTH = 'http://localhost:5001';
+const AVAIL = 'http://localhost:5002';
+const BOOKING = '';
+
+const STATUS_RU = { Pending: 'Ожидает', Confirmed: 'Подтверждена', Cancelled: 'Отменена', Completed: 'Завершена', NoShow: 'Не пришли' };
+const $ = id => document.getElementById(id);
+
+const state = {
+  token: null, refreshToken: null, email: '',
+  hallId: null, hallName: '', tables: [], cells: new Map(), times: [],
+  date: '', time: '', guests: 2, selected: null,
+  bookings: [], events: [], busy: false
+};
+let hub = null;
+
+// ---------- small helpers ----------
+function el(tag, props, ...children) {
+  const node = document.createElement(tag);
+  for (const [k, v] of Object.entries(props || {})) {
+    if (k === 'class') node.className = v;
+    else if (k.startsWith('on')) node.addEventListener(k.slice(2), v);
+    else if (v !== false && v != null) node.setAttribute(k, v === true ? '' : v);
+  }
+  for (const c of children.flat()) if (c != null) node.append(c.nodeType ? c : document.createTextNode(String(c)));
+  return node;
+}
+function store(key, value) {
+  try { value == null ? sessionStorage.removeItem(key) : sessionStorage.setItem(key, JSON.stringify(value)); } catch { /* storage may be blocked */ }
+}
+function load(key) {
+  try { return JSON.parse(sessionStorage.getItem(key)); } catch { return null; }
+}
+function toast(text, isError) {
+  const t = el('div', { class: 'toast' + (isError ? ' err' : '') }, text);
+  $('toasts').append(t);
+  setTimeout(() => t.remove(), isError ? 6000 : 3500);
+}
+const hhmm = t => t.slice(0, 5);
+function seats(n) {
+  const m10 = n % 10, m100 = n % 100;
+  const word = m10 === 1 && m100 !== 11 ? 'место' : (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) ? 'места' : 'мест';
+  return n + ' ' + word;
+}
+const fmtDateTime = s => `${s.slice(8, 10)}.${s.slice(5, 7)}.${s.slice(0, 4)} ${s.slice(11, 16)}`;
+function todayPlus(days) {
+  const d = new Date(); d.setDate(d.getDate() + days);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+function newKey() {
+  return (crypto.randomUUID && crypto.randomUUID()) || 'k-' + Date.now() + '-' + Math.random().toString(16).slice(2);
+}
+
+// ---------- HTTP with token refresh ----------
+async function toError(res) {
+  let msg = 'Ошибка ' + res.status;
+  try {
+    const data = await res.json();
+    if (data.errors) msg = Object.values(data.errors).flat().join('; ');
+    else if (data.title) msg = data.title;
+  } catch { /* the body was not JSON */ }
+  const err = new Error(msg); err.status = res.status; return err;
+}
+let refreshing = null;
+async function tryRefresh() {
+  if (!state.refreshToken) return false;
+  refreshing ??= (async () => {
+    try {
+      const res = await fetch(AUTH + '/api/auth/refresh', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken: state.refreshToken })
+      });
+      if (!res.ok) return false;
+      setSession(await res.json(), state.email);
+      return true;
+    } catch { return false; } finally { refreshing = null; }
+  })();
+  return refreshing;
+}
+async function api(base, path, { method = 'GET', body, auth = true } = {}) {
+  const run = () => {
+    const headers = {};
+    if (body) headers['Content-Type'] = 'application/json';
+    if (auth && state.token) headers['Authorization'] = 'Bearer ' + state.token;
+    return fetch(base + path, { method, headers, body: body ? JSON.stringify(body) : undefined });
+  };
+  let res = await run();
+  if (res.status === 401 && auth && await tryRefresh()) res = await run();
+  if (res.status === 401 && auth) { logout(true); }
+  if (!res.ok) throw await toError(res);
+  if (res.status === 204) return null;
+  const text = await res.text();
+  return text ? JSON.parse(text) : null;
+}
+
+// ---------- session ----------
+function setSession(resp, email) {
+  state.token = resp.accessToken; state.refreshToken = resp.refreshToken; state.email = email || state.email;
+  store('session', { token: state.token, refresh: state.refreshToken, email: state.email });
+}
+async function afterLogin() {
+  renderUser();
+  await Promise.all([loadBookings(), connectHub()]);
+  await subscribeAll();
+  renderAll();
+}
+function logout(expired) {
+  const refresh = state.refreshToken;
+  if (!expired && state.token && refresh) {
+    fetch(AUTH + '/api/auth/logout', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + state.token },
+      body: JSON.stringify({ refreshToken: refresh })
+    }).catch(() => {});
+  }
+  state.token = state.refreshToken = null; state.email = ''; state.bookings = []; state.selected = null;
+  store('session', null);
+  if (hub) { hub.stop().catch(() => {}); hub = null; }
+  setConn('off', 'Live: нужен вход');
+  renderUser(); renderAll();
+  if (expired) toast('Сессия истекла, войдите снова', true);
+}
+
+// ---------- data ----------
+async function loadHall() {
+  const halls = await api(AVAIL, '/api/halls', { auth: false });
+  if (!halls.length) throw new Error('В ресторане ещё нет залов');
+  state.hallId = halls[0].id; state.hallName = halls[0].name;
+  $('hallName').textContent = state.hallName;
+  state.tables = (await api(AVAIL, `/api/halls/${state.hallId}/tables`, { auth: false }))
+    .sort((a, b) => a.tableNumber - b.tableNumber);
+}
+async function loadGrid() {
+  const slots = await api(AVAIL, `/api/halls/${state.hallId}/slots?date=${state.date}`, { auth: false });
+  state.cells = new Map(slots.map(s => [s.tableId + '|' + hhmm(s.slotTime), s.isAvailable]));
+  state.times = [...new Set(slots.map(s => hhmm(s.slotTime)))].sort();
+  const select = $('time');
+  select.replaceChildren(...state.times.map(t => el('option', { value: t }, t)));
+  if (!state.times.includes(state.time)) state.time = state.times.includes('19:00') ? '19:00' : (state.times[0] || '');
+  select.value = state.time;
+  renderAll();
+}
+async function loadBookings() {
+  if (!state.token) return;
+  try {
+    state.bookings = (await api(BOOKING, '/api/bookings')).sort((a, b) => b.startTime.localeCompare(a.startTime));
+  } catch (e) { if (e.status !== 401) toast(e.message, true); }
+  renderBookings();
+}
+let refreshTimer = null;
+function scheduleRefresh() {
+  clearTimeout(refreshTimer);
+  refreshTimer = setTimeout(() => { loadGrid().catch(() => {}); loadBookings(); }, 250);
+}
+
+// ---------- SignalR ----------
+function setConn(kind, text) {
+  $('conn').className = 'pill ' + kind;
+  $('connText').textContent = text;
+}
+function addEvent(kind, text) {
+  state.events.unshift({ kind, text, time: new Date().toLocaleTimeString('ru-RU') });
+  state.events.length = Math.min(state.events.length, 40);
+  renderEvents();
+}
+function tableNumber(id) { return state.tables.find(t => t.id === id)?.tableNumber ?? '?'; }
+function flash(tableId) {
+  const node = document.querySelector(`.table[data-id="${tableId}"]`);
+  if (!node) return;
+  node.classList.remove('flash'); void node.offsetWidth; node.classList.add('flash');
+}
+function onTable(kind, e) {
+  const slot = e.slotTime.slice(0, 16).replace('T', ' ');
+  addEvent(kind, `Стол №${tableNumber(e.tableId)}: ${kind === 'locked' ? 'занят' : 'свободен'} в ${slot.slice(11)} (${slot.slice(8, 10)}.${slot.slice(5, 7)})`);
+  if (e.slotTime.slice(0, 10) === state.date) { scheduleRefresh(); setTimeout(() => flash(e.tableId), 400); }
+}
+async function connectHub() {
+  if (hub || !state.token) return;
+  if (typeof signalR === 'undefined') { setConn('off', 'Live: нет клиента SignalR (интернет?)'); return; }
+  hub = new signalR.HubConnectionBuilder()
+    .withUrl(BOOKING + '/hubs/bookings', { accessTokenFactory: () => state.token })
+    .withAutomaticReconnect().build();
+  hub.on('TableLocked', e => onTable('locked', e));
+  hub.on('TableReleased', e => onTable('released', e));
+  hub.on('BookingStatusChanged', e => {
+    addEvent('status', `Бронь ${e.bookingId.slice(0, 8)}: ${STATUS_RU[e.status] || e.status}`);
+    toast('Статус брони: ' + (STATUS_RU[e.status] || e.status));
+    loadBookings();
+  });
+  hub.onreconnecting(() => setConn('wait', 'Live: переподключение...'));
+  hub.onreconnected(async () => { setConn('on', 'Live: подключено'); await subscribeAll(); scheduleRefresh(); });
+  hub.onclose(() => { if (hub) setConn('off', 'Live: отключено'); });
+  try { await hub.start(); setConn('on', 'Live: подключено'); }
+  catch (e) { hub = null; setConn('off', 'Live: не удалось подключиться'); }
+}
+async function subscribeAll() {
+  if (!hub || hub.state !== 'Connected') return;
+  for (const b of state.bookings) {
+    if (b.status === 'Pending' || b.status === 'Confirmed') hub.invoke('SubscribeBooking', b.id).catch(() => {});
+  }
+}
+
+// ---------- rendering ----------
+function tableStatus(t) {
+  if (t.capacity < state.guests) return 'small';
+  const key = t.id + '|' + state.time;
+  if (!state.cells.has(key)) return 'closed';
+  return state.cells.get(key) ? 'free' : 'busy';
+}
+const STATUS_TEXT = { free: 'Свободен', busy: 'Занят', small: 'Мало мест', closed: 'Недоступен' };
+function tableSvg(t) {
+  const n = Math.min(t.capacity, 12), cx = 60, cy = 60, R = 44;
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 120 120');
+  const add = (name, attrs, text) => {
+    const n2 = document.createElementNS('http://www.w3.org/2000/svg', name);
+    for (const [k, v] of Object.entries(attrs)) n2.setAttribute(k, v);
+    if (text != null) n2.textContent = text;
+    svg.append(n2);
+  };
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * 2 * Math.PI - Math.PI / 2;
+    add('circle', { class: 'chair', cx: (cx + R * Math.cos(a)).toFixed(1), cy: (cy + R * Math.sin(a)).toFixed(1), r: 7 });
+  }
+  if (t.tableType === 'Bar') add('rect', { class: 'tabletop', x: 36, y: 36, width: 48, height: 48, rx: 10 });
+  else add('circle', { class: 'tabletop', cx, cy, r: 28 });
+  add('text', { class: 'num', x: cx, y: 69, 'text-anchor': 'middle' }, String(t.tableNumber));
+  return svg;
+}
+function renderHall() {
+  const nodes = state.tables.map(t => {
+    const st = tableStatus(t);
+    const isSel = state.selected === t.id && st === 'free';
+    const typeBadge = t.tableType !== 'Standard' ? el('span', { class: 'badge' }, t.tableType.toUpperCase()) : null;
+    return el('button', {
+      class: `table ${st}${isSel ? ' selected' : ''}`, 'data-id': t.id, type: 'button',
+      title: st === 'free' ? 'Нажмите, чтобы выбрать' : STATUS_TEXT[st],
+      'aria-pressed': isSel ? 'true' : 'false',
+      onclick: () => { if (st !== 'free') return; state.selected = t.id; renderHall(); renderBookPanel(); }
+    },
+      tableSvg(t),
+      el('div', { class: 'label' }, `Стол №${t.tableNumber}`, typeBadge),
+      el('div', { class: 'sub' }, seats(t.capacity)),
+      el('div', { class: 'state' }, STATUS_TEXT[st]));
+  });
+  $('hall').replaceChildren(...(nodes.length ? nodes : [el('div', { class: 'empty' }, 'В зале пока нет столиков')]));
+}
+function renderBookPanel() {
+  const panel = $('bookPanel');
+  const t = state.tables.find(x => x.id === state.selected);
+  if (!t || tableStatus(t) !== 'free') {
+    state.selected = null;
+    panel.replaceChildren(el('div', { class: 'hint' }, state.times.length
+      ? 'Выберите свободный столик на схеме, чтобы забронировать.'
+      : 'На эту дату бронирование недоступно (выходной или закрытая дата).'));
+    return;
+  }
+  const info = el('div', {},
+    el('b', {}, `Стол №${t.tableNumber}, ${seats(t.capacity)}`),
+    el('div', { class: 'hint' }, `${state.date.split('-').reverse().join('.')} в ${state.time}, гостей: ${state.guests}`));
+  const btn = el('button', { class: 'btn primary', type: 'button', disabled: state.busy, onclick: book },
+    state.token ? 'Забронировать' : 'Войти и забронировать');
+  panel.replaceChildren(info, btn);
+}
+function renderBookings() {
+  const box = $('myBookings');
+  if (!state.token) { box.replaceChildren(el('div', { class: 'empty' }, 'Войдите, чтобы видеть свои брони.')); return; }
+  if (!state.bookings.length) { box.replaceChildren(el('div', { class: 'empty' }, 'Броней пока нет.')); return; }
+  const items = state.bookings.map(b => {
+    const canCancel = b.status === 'Pending' || b.status === 'Confirmed';
+    return el('li', {},
+      el('div', { class: 'bk-main' }, `Стол №${tableNumber(b.tableId)} · ${fmtDateTime(b.startTime)} · ${b.guestsCount} гост.`),
+      el('div', { class: 'bk-meta' },
+        el('span', { class: 'chip ' + b.status }, STATUS_RU[b.status] || b.status),
+        el('span', {}, 'Код ' + b.confirmationCode),
+        canCancel ? el('button', { class: 'btn small', type: 'button', onclick: () => cancelBooking(b.id) }, 'Отменить') : null));
+  });
+  box.replaceChildren(el('ul', { class: 'list' }, items));
+}
+function renderEvents() {
+  const body = $('eventsBody');
+  if (!state.events.length) {
+    body.replaceChildren(el('div', { class: 'empty' }, state.token
+      ? 'Пока тихо. Забронируйте столик (в том числе из другой вкладки), и здесь появятся события.'
+      : 'События приходят по SignalR после входа.'));
+    return;
+  }
+  body.replaceChildren(el('ul', { class: 'list' }, state.events.map(e =>
+    el('li', {}, el('span', { class: 't' }, e.time), el('span', { class: 'k ' + e.kind }, e.kind === 'status' ? 'статус' : e.kind === 'locked' ? 'занят' : 'свободен'), el('span', {}, e.text)))));
+}
+function renderUser() {
+  $('userbox').replaceChildren(state.token
+    ? el('span', {}, el('span', { class: 'hint', style: 'margin-right:10px;color:var(--muted)' }, state.email), el('button', { class: 'btn small', type: 'button', onclick: () => logout(false) }, 'Выйти'))
+    : el('button', { class: 'btn primary', type: 'button', onclick: () => openAuth('login') }, 'Войти'));
+}
+function renderAll() { renderHall(); renderBookPanel(); renderBookings(); renderEvents(); }
+
+// ---------- actions ----------
+async function book() {
+  if (!state.token) { openAuth('login'); return; }
+  const t = state.tables.find(x => x.id === state.selected);
+  if (!t) return;
+  state.busy = true; renderBookPanel();
+  try {
+    const res = await api(BOOKING, '/api/bookings', {
+      method: 'POST',
+      body: { tableId: t.id, startTime: `${state.date}T${state.time}:00`, guestsCount: state.guests, idempotencyKey: newKey() }
+    });
+    toast(`Бронь создана, код ${res.confirmationCode}. Ждём подтверждения...`);
+    addEvent('status', `Бронь ${res.id.slice(0, 8)}: ${STATUS_RU[res.status] || res.status}`);
+    if (hub && hub.state === 'Connected') hub.invoke('SubscribeBooking', res.id).catch(() => {});
+    state.selected = null;
+    await Promise.all([loadGrid(), loadBookings()]);
+  } catch (e) {
+    toast(e.message, true);
+    loadGrid().catch(() => {});
+  } finally { state.busy = false; renderBookPanel(); }
+}
+async function cancelBooking(id) {
+  try {
+    await api(BOOKING, `/api/bookings/${id}/cancel`, { method: 'POST' });
+    toast('Бронь отменена');
+    await Promise.all([loadGrid(), loadBookings()]);
+  } catch (e) { toast(e.message, true); }
+}
+
+// ---------- login / register dialog ----------
+let authMode = 'login';
+function openAuth(mode) {
+  authMode = mode;
+  const reg = mode === 'register';
+  $('authTitle').textContent = reg ? 'Регистрация' : 'Вход';
+  $('regFields').hidden = !reg;
+  $('authSubmit').textContent = reg ? 'Создать аккаунт' : 'Войти';
+  $('authSwitch').textContent = reg ? 'Уже есть аккаунт? Войти' : 'Нет аккаунта? Регистрация';
+  $('password').autocomplete = reg ? 'new-password' : 'current-password';
+  $('authErr').textContent = '';
+  if (!$('authDialog').open) $('authDialog').showModal();
+}
+$('authSwitch').onclick = () => openAuth(authMode === 'login' ? 'register' : 'login');
+$('authCancel').onclick = () => $('authDialog').close();
+$('authForm').onsubmit = async ev => {
+  ev.preventDefault();
+  const email = $('email').value.trim(), password = $('password').value;
+  $('authSubmit').disabled = true; $('authErr').textContent = '';
+  try {
+    const resp = authMode === 'register'
+      ? await api(AUTH, '/api/auth/register', { method: 'POST', auth: false, body: {
+          email, password, firstName: $('firstName').value.trim(), lastName: $('lastName').value.trim(), phoneNumber: $('phone').value.trim() } })
+      : await api(AUTH, '/api/auth/login', { method: 'POST', auth: false, body: { email, password } });
+    setSession(resp, email);
+    $('authDialog').close();
+    toast(authMode === 'register' ? 'Аккаунт создан' : 'Добро пожаловать');
+    await afterLogin();
+  } catch (e) { $('authErr').textContent = e.message; }
+  finally { $('authSubmit').disabled = false; }
+};
+
+// ---------- start ----------
+$('date').onchange = () => { state.date = $('date').value; state.selected = null; loadGrid().catch(e => toast(e.message, true)); };
+$('time').onchange = () => { state.time = $('time').value; renderAll(); };
+$('guests').oninput = () => { state.guests = Math.max(1, Number($('guests').value) || 1); renderAll(); };
+
+(async function init() {
+  if (location.port !== '5003') {
+    const b = $('banner'); b.hidden = false;
+    b.textContent = 'Откройте эту страницу по адресу http://localhost:5003/hall.html: тогда SignalR и запросы к BookingService будут работать.';
+  }
+  state.date = todayPlus(1);
+  $('date').value = state.date; $('date').min = todayPlus(0);
+  renderUser(); renderAll();
+  try {
+    await loadHall();
+    await loadGrid();
+  } catch (e) {
+    toast('Не удалось загрузить зал: ' + e.message + '. Запущен ли AvailabilityService (порт 5002)?', true);
+    $('hallName').textContent = 'нет связи с AvailabilityService';
+  }
+  const saved = load('session');
+  if (saved && saved.token) {
+    state.token = saved.token; state.refreshToken = saved.refresh; state.email = saved.email || '';
+    try { await api(BOOKING, '/api/bookings'); await afterLogin(); } catch { logout(false); }
+  }
+})();
+</script>
+</body>
+</html>

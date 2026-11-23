@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="../AuthServiceApi/AuthServiceApi.csproj" />
+  <Project Path="../AvailabilityServiceApi/AvailabilityServiceApi.csproj" />
+  <Project Path="../BookingServiceApi/BookingServiceApi.csproj" />
+  <Project Path="../NotificationServiceApi/NotificationServiceApi.csproj" />
+</Solution>

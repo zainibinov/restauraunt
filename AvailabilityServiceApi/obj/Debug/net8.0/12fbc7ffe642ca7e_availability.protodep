@@ -1,0 +1,2 @@
+obj\Debug\net8.0\Protos/Availability.cs \
+obj\Debug\net8.0\Protos/AvailabilityGrpc.cs: Protos/availability.proto

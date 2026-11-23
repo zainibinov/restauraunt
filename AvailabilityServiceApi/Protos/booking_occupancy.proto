@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+option csharp_namespace = "RestaurantBooking.Grpc";
+
+package booking;
+
+// Called by AvailabilityService: which tables already have bookings on a given date.
+service BookingGrpc {
+  rpc GetBookedSlots (GetBookedSlotsRequest) returns (BookedSlotsReply);
+}
+
+message GetBookedSlotsRequest {
+  string date = 1;                    // yyyy-MM-dd
+  repeated string table_ids = 2;
+}
+
+message BookedSlotsReply {
+  repeated BookedSlot slots = 1;      // only Pending and Confirmed bookings
+}
+
+message BookedSlot {
+  string table_id = 1;
+  string start_time = 2;              // yyyy-MM-ddTHH:mm  (the start of the booking)
+}

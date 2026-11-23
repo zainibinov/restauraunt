@@ -1,0 +1,52 @@
+syntax = "proto3";
+
+option csharp_namespace = "RestaurantBooking.Grpc";
+
+package availability;
+
+// Called by BookingService.
+service AvailabilityGrpc {
+  // NOT_FOUND if there is no such table.
+  rpc GetTableInfo (GetTableInfoRequest) returns (TableInfo);
+
+  // Is the table open for booking at the given date and time (working hours, closing time, blackout dates)?
+  // NOT_FOUND if there is no such table.
+  rpc GetTableAvailability (GetTableAvailabilityRequest) returns (TableAvailability);
+
+  // Slot step, stay duration and cleaning buffer for the given date.
+  // NOT_FOUND if the restaurant does not work that day.
+  // (This method is an addition to the contracts of the document, section 2.4.5.)
+  rpc GetBookingParameters (GetBookingParametersRequest) returns (BookingParametersInfo);
+}
+
+message GetTableInfoRequest {
+  string table_id = 1;
+}
+
+message TableInfo {
+  string table_id = 1;
+  string hall_id = 2;
+  int32 capacity = 3;
+  string table_type = 4;   // Standard, Vip, Bar
+}
+
+message GetTableAvailabilityRequest {
+  string table_id = 1;
+  string date = 2;         // yyyy-MM-dd
+  string time = 3;         // HH:mm; if empty - the answer is about the whole day
+}
+
+message TableAvailability {
+  bool is_available = 1;
+  repeated string occupied_slots = 2;   // "HH:mm" of the slots that are not available on that date
+}
+
+message GetBookingParametersRequest {
+  string date = 1;         // yyyy-MM-dd
+}
+
+message BookingParametersInfo {
+  int32 slot_step_minutes = 1;
+  int32 duration_minutes = 2;
+  int32 cleaning_buffer_minutes = 3;
+}

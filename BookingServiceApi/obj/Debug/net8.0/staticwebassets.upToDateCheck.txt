@@ -1,0 +1,2 @@
+wwwroot\signalr-test.html
+wwwroot\hall.html

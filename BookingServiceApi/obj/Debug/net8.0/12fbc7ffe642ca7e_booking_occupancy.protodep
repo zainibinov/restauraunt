@@ -1,0 +1,2 @@
+obj\Debug\net8.0\Protos/BookingOccupancy.cs \
+obj\Debug\net8.0\Protos/BookingOccupancyGrpc.cs: Protos/booking_occupancy.proto

@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+option csharp_namespace = "RestaurantBooking.Grpc";
+
+package auth;
+
+// Called by BookingService when a booking is created.
+service AuthGrpc {
+  // NOT_FOUND if there is no such user.
+  rpc GetUserContact (GetUserContactRequest) returns (UserContactInfo);
+}
+
+message GetUserContactRequest {
+  string user_id = 1;
+}
+
+message UserContactInfo {
+  string user_id = 1;
+  string email = 2;
+  string phone = 3;
+  string full_name = 4;
+}
